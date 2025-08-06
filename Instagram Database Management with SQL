@@ -1,4 +1,4 @@
-CREATE Database Instagram;
+CREATE DATABASE Instagram;
 
 USE Instagram;
 
@@ -36,6 +36,15 @@ Create Table likes (
     );
 
 create table followers (
+	follower_id integer not null,
+    followee_id integer not null,
+    created_at timestamp default NOW(),
+    Foreign Key (follower_id) references users(id),
+    Foreign Key (followee_id) references users(id),
+    Primary KEY(follower_id, followee_id)
+);
+
+create table unfollowers (
 	follower_id integer not null,
     followee_id integer not null,
     created_at timestamp default NOW(),
@@ -118,6 +127,32 @@ Inner join likes
 	on users.id = likes.user_id
 group by likes.user_id
 HAVING num_total = (SELECT COUNT(*) FROM photos);
+
+DELIMITER $$
+-- Search narcissit people who are following themselves
+CREATE TRIGGER prevent_self_follows
+	BEFORE INSERT ON followers FOR EACH ROW
+    BEGIN
+		IF NEW.follower_id = NEW.followee_id
+        THEN
+			SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'You cannot follow yourself!';
+		END IF;
+    END;
+$$
+
+-- When and who is unfollowing?
+CREATE TRIGGER capture_unfollow
+	AFTER DELETE ON followers FOR EACH ROW
+    BEGIN
+		INSERT INTO unfollowers(follower_id, followee_id)
+        VALUES(OLD.follower_id,OLD.followee_id);
+	END;
+    
+$$
+
+DELIMITER ;
+DROP TRIGGER capture_unfollow;
 
 
 
